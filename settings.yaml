@@ -1,0 +1,92 @@
+# =============================================================================
+# CELCOMEN / SIMCOMEN pipeline settings
+# =============================================================================
+
+# --- Main folder and external input ------------------------------------------
+project:
+  project_dir:      "/home/directory/test"                                   # Base directory with input rds project where output files will be exported
+  input_object:     "seurat_obj.rds"                                         # Input rds object, named as seurat_obj.rds
+  protein_gene_dir: "/home/directory/Protein_coding_genes"                   # In case of analysis of only protein codng genes with FindMarkers
+
+# --- Input Seurat expression --------------------------------------------------
+input_data:
+  spatial_assay: "Spatial.008um"                                                        # Name of assy to use
+  diet_layer:    "counts"                                                               # Name of layer to use
+
+# --- Cohort / biology ---------------------------------------------------------
+cohort:
+  sample_column:     "orig.ident"                                                       # Name of metadata column with the main grouping, eg, with WT and Mutant, or Young and Aged
+  mutant_value:      "MUT"                                                              # Grouping that the main perturbation will be performed into
+  annotation_column: "AnnoGroup"                                                        # Name of metadata column with the different cell populations and grouping as seperators (e.g. WT_Blood_cells, Mut_Blood_cells, WT_Pericytes....)
+  target_gene:       "Relb"                                                             # Gene to be perturbed
+  included_genes:    ["Relb", "Map3k14"]                                                # always included in the analysis gene set
+  target_populations:                                                                   # Populations from annotation_column to be perturbed
+    - "Acinar_cells_Mutant"
+    - "ADM_cells_1_Mutant"
+    - "ADM_cells_2_Mutant"
+  reference_populations:                                                                # Populations from annotation_column to be used in the perturbation but not be directly changed
+    - "Acinar_cells_Mutant"
+    - "ADM_cells_1_Mutant"
+    - "ADM_cells_2_Mutant"
+    - "Acinar_cells_WT"
+
+# --- Annotation display: labels, colors, and order ---------------------------
+display:                                                                                # Adjsuting display order, size and more
+  reference_cell_size: 1.5
+  order_raw:
+    - "Acinar_cells_WT"
+    - "Acinar_cells_Mutant"
+    - "ADM_cells_1_Mutant"
+    - "ADM_cells_2_Mutant"
+  labels:
+    Acinar_cells_WT:     "Acinar cells (WT)"
+    Acinar_cells_Mutant: "Acinar cells (NΔTC)"
+    ADM_cells_1_Mutant:  "Early ADM cells"
+    ADM_cells_2_Mutant:  "Late ADM cells"
+  colors:
+    Acinar_cells_WT:     "#4E79A7"
+    Acinar_cells_Mutant: "#59A14F"
+    ADM_cells_1_Mutant:  "#F28E2B"
+    ADM_cells_2_Mutant:  "#8E63D2"
+
+# --- Analysis gene set --------------------------------------------------------
+model_genes:
+  n_model_genes: 500                                                                    # Number of total genes to be examined
+
+# --- CELCOMEN training: ---------------------------------------------
+celcomen:                                                                               # CELCOMEN properties
+  n_neighbors: 6
+  distance_threshold: null
+  epochs: 200
+  learning_rate: 0.1
+  zmft_scalar: 0.1
+  seed: 0
+
+# --- SIMCOMEN training: ---------------------------------------------
+simcomen:                                                                               #CIMCOMEN properties
+  n_neighbors: 6
+  epochs: 50
+  learning_rate: 0.1
+  zmft_scalar: 0.1
+  seed: 0
+
+# --- Shared Python environment -----------------------------------------------         # Python env for celcomen and simcomen
+export:
+  python_env: "celcomen_env"
+
+# --- Stream-plot labels: --------------------------------------------
+plots:
+  label_fontsize: 17
+  label_stroke_linewidth: 3.0
+
+# --- Differential expression: --------------------------------------                   # FindMarkers properties
+differential_expression:
+  min_cells_per_ident: 10
+  species_study: "mouse"
+  check_only_protein_coding_genes: false
+
+# Each comparison is [after perturbation, before perturbation].                         # Comparison of populations from annotation_column
+comparisons:
+  - ["Acinar_cells_Mutant_After", "Acinar_cells_Mutant_Before"]
+  - ["ADM_cells_1_Mutant_After",  "ADM_cells_1_Mutant_Before"]
+  - ["ADM_cells_2_Mutant_After",  "ADM_cells_2_Mutant_Before"]
