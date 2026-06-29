@@ -62,11 +62,26 @@ celcomen:                                                                       
   zmft_scalar: 0.1
   seed: 0
 
-# --- SIMCOMEN training: ---------------------------------------------
-simcomen:                                                                               #CIMCOMEN properties
-  n_neighbors: 6
-  epochs: 50
-  learning_rate: 0.1
+# --- SIMCOMEN: KO (perturbation) run -----------------------------------------
+simcomen_ko:                                                                            # SIMCOMEN properties for the gene-knockout run
+  group:              "MUT"                                                             # Value in cohort.sample_column to perturb (single group)
+  target_populations:                                                                   # Populations from annotation_column to perturb (target_gene set to zero)
+    - "Acinar_cells_Mutant"
+    - "ADM_cells_1_Mutant"
+    - "ADM_cells_2_Mutant"
+  n_neighbors: 10
+  epochs: 1000
+  learning_rate: 0.001
+  zmft_scalar: 0.1
+  seed: 0
+
+# --- SIMCOMEN: sham (reference) run -------------------------------------------
+simcomen_sham:                                                                          # SIMCOMEN properties for the sham control run (no gene changed)
+  group:              ["WT", "MUT"]                                                     # Value(s) in cohort.sample_column used as the reference; each processed separately
+  target_populations: []                                                                # Empty = all populations of the group(s); or list a subset
+  n_neighbors: 10
+  epochs: 1000
+  learning_rate: 0.001
   zmft_scalar: 0.1
   seed: 0
 

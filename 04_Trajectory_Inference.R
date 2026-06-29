@@ -32,10 +32,10 @@ reticulate::use_condaenv(python_env, required = TRUE)
 celcomen_dir <- file.path(project_dir, "celcomen_input_rna_top_genes", "celcomen_output_rna_top_genes")
 
 results_subdir   <- "simcomen_perturbed"
-reference_subdir <- "simcomen_reference"
+reference_subdir <- "simcomen_sham"
 
 mut_h5ad_name <- "simcomen_perturbed_results.h5ad"
-ref_h5ad_name <- "simcomen_reference_pre_states.h5ad"
+ref_h5ad_name <- "simcomen_sham_results.h5ad"
 
 h5ad_file_mut <- file.path(celcomen_dir, results_subdir, mut_h5ad_name)
 h5ad_file_ref <- file.path(celcomen_dir, reference_subdir, ref_h5ad_name)
@@ -48,7 +48,7 @@ source_assay   <- "originalexp"
 mut_assay      <- "perturbed"
 ref_assay      <- "reference"
 mut_data_layer <- "simcomen_post_perturbed"
-ref_data_layer <- "simcomen_pre_normal"
+ref_data_layer <- "simcomen_post_sham"
 mut_project    <- "SIMCOMEN_perturbed"
 ref_project    <- "SIMCOMEN_reference"
 

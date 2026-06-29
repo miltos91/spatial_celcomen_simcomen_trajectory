@@ -17,7 +17,7 @@ PYTHON_ENV = config["export"]["python_env"]
 INPUT_DIR = PROJECT_DIR / "celcomen_input_rna_top_genes"
 CELCOMEN_DIR = INPUT_DIR / "celcomen_output_rna_top_genes"
 SIMCOMEN_RESULTS_DIR = CELCOMEN_DIR / "simcomen_perturbed"
-REFERENCE_RESULTS_DIR = CELCOMEN_DIR / "simcomen_reference"
+SHAM_RESULTS_DIR = CELCOMEN_DIR / "simcomen_sham"
 GRAPH_DIR = PROJECT_DIR / "Simcomen_diff_results" / "graphs"
 DEG_DIR = PROJECT_DIR / "Simcomen_diff_results" / "DEGs"
 
@@ -28,7 +28,9 @@ CELCOMEN_LOSS = CELCOMEN_DIR / "training_loss.csv"
 
 MUTANT_H5AD = SIMCOMEN_RESULTS_DIR / "simcomen_perturbed_results.h5ad"
 SIMCOMEN_LOSS = SIMCOMEN_RESULTS_DIR / "simcomen_training_loss.csv"
-REFERENCE_H5AD = REFERENCE_RESULTS_DIR / "simcomen_reference_pre_states.h5ad"
+
+SHAM_H5AD = SHAM_RESULTS_DIR / "simcomen_sham_results.h5ad"
+SHAM_LOSS = SHAM_RESULTS_DIR / "simcomen_training_loss_sham.csv"
 
 REFERENCE_RDS = PROJECT_DIR / "simcomen_seurat_reference.rds"
 PERTURBED_RDS = PROJECT_DIR / "simcomen_seurat_perturbed.rds"
@@ -91,7 +93,22 @@ rule run_simcomen:
     output:
         mutant_h5ad=str(MUTANT_H5AD),
         loss=str(SIMCOMEN_LOSS),
-        reference_h5ad=str(REFERENCE_H5AD),
+    params:
+        env=PYTHON_ENV,
+    shell:
+        'conda run --no-capture-output -n "{params.env}" '
+        'python "{input.script}" --settings "{input.settings}"'
+
+
+rule run_sham:
+    input:
+        settings=str(SETTINGS_FILE),
+        h5ad=str(INPUT_H5AD),
+        parameters=str(CELCOMEN_PARAMETERS),
+        script=str(WORKFLOW_DIR / "03B_Simcomen.py"),
+    output:
+        sham_h5ad=str(SHAM_H5AD),
+        loss=str(SHAM_LOSS),
     params:
         env=PYTHON_ENV,
     shell:
@@ -103,7 +120,7 @@ rule return_to_seurat:
     input:
         settings=str(SETTINGS_FILE),
         mutant_h5ad=str(MUTANT_H5AD),
-        reference_h5ad=str(REFERENCE_H5AD),
+        reference_h5ad=str(SHAM_H5AD),
         script=str(WORKFLOW_DIR / "04_Trajectory_Inference.R"),
     output:
         reference_rds=str(REFERENCE_RDS),

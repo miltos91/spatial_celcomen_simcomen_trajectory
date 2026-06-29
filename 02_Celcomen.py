@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # =============================================================================
 import argparse
+import shutil
+import tempfile
 from pathlib import Path
 
 import anndata as ad
@@ -8,6 +10,7 @@ import numpy as np
 import pandas as pd
 import torch
 import yaml
+from scipy import sparse as sp
 
 from celcomen.datareaders.datareader import get_dataset_loaders
 from celcomen.models.celcomen import celcomen
@@ -78,19 +81,57 @@ print(f"AnnData: {adata.n_obs} cells x {adata.n_vars} genes")
 print(f"Samples: {adata.obs[SAMPLE_COLUMN].nunique()}")
 print(f"Selected device: {DEVICE}")
 
+# =============================================================================
+# PER-CELL L2 NORMALIZATION ACROSS THE MODEL GENES
+# =============================================================================
+
+X = adata.X
+
+if sp.issparse(X):
+    cell_l2 = np.sqrt(np.asarray(X.power(2).sum(axis=1)).ravel())
+else:
+    X = np.asarray(X, dtype=np.float64)
+    cell_l2 = np.sqrt(np.square(X).sum(axis=1)).ravel()
+
+if np.any(~np.isfinite(cell_l2)):
+    raise ValueError("At least one cell has a non-finite L2 norm.")
+
+if np.any(cell_l2 == 0):
+    n_zero = int(np.sum(cell_l2 == 0))
+    raise ValueError(
+        f"{n_zero} cells have zero expression across all selected model genes "
+        "and therefore cannot be L2-normalized."
+    )
+
+if sp.issparse(X):
+    X = X.multiply((1.0 / cell_l2)[:, None]).tocsr().astype(np.float32)
+else:
+    X = (X / cell_l2[:, None]).astype(np.float32)
+
+adata.X = X
+
+if sp.issparse(adata.X):
+    cell_l2_check = np.sqrt(np.asarray(adata.X.power(2).sum(axis=1)).ravel())
+else:
+    cell_l2_check = np.sqrt(np.square(np.asarray(adata.X)).sum(axis=1)).ravel()
+
+if not np.allclose(cell_l2_check, 1.0, atol=1e-5, rtol=1e-5):
+    raise RuntimeError(
+        "Per-cell L2 normalization failed. Observed range: "
+        f"{cell_l2_check.min():.8f} to {cell_l2_check.max():.8f}."
+    )
+
+print(
+    "Per-cell L2 norms after normalization: "
+    f"min={cell_l2_check.min():.6f}, max={cell_l2_check.max():.6f}"
+)
+
 n_genes = adata.n_vars
 
 np.random.seed(SEED)
 torch.manual_seed(SEED)
-
-dataloader = get_dataset_loaders(
-    str(INPUT_H5AD),
-    sample_id_name=SAMPLE_COLUMN,
-    n_neighbors=N_NEIGHBORS,
-    distance=DISTANCE_THRESHOLD,
-    device=DEVICE,
-    verbose=False,
-)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
 
 # =============================================================================
 # INITIALIZE AND TRAIN CELCOMEN
@@ -121,21 +162,36 @@ model.set_g2g_intra(
 
 model.to(DEVICE)
 
-print("Starting CELCOMEN training.")
+tmp_dir = Path(tempfile.mkdtemp(prefix="celcomen_norm_", dir=OUTPUT_DIR))
+normalized_h5ad = tmp_dir / "celcomen_training_normalized.h5ad"
+adata.write_h5ad(normalized_h5ad, compression="gzip")
 
-losses = train(
-    EPOCHS,
-    LEARNING_RATE,
-    model,
-    dataloader,
-    zmft_scalar=ZMFT_SCALAR,
-    seed=SEED,
-    device=DEVICE,
-    verbose=False,
-)
+try:
+    dataloader = get_dataset_loaders(
+        str(normalized_h5ad),
+        sample_id_name=SAMPLE_COLUMN,
+        n_neighbors=N_NEIGHBORS,
+        distance=DISTANCE_THRESHOLD,
+        device=DEVICE,
+        verbose=False,
+    )
 
-print("CELCOMEN training completed.")
+    print("Starting CELCOMEN training.")
 
+    losses = train(
+        EPOCHS,
+        LEARNING_RATE,
+        model,
+        dataloader,
+        zmft_scalar=ZMFT_SCALAR,
+        seed=SEED,
+        device=DEVICE,
+        verbose=False,
+    )
+
+    print("CELCOMEN training completed.")
+finally:
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
 # =============================================================================
 # SAVE RESULTS

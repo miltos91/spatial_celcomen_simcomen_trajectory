@@ -1,10 +1,10 @@
 # Seurat v5 - Spatial in-silico perturbation with CELCOMEN / SIMCOMEN and trajectory inference
 
 ## Main goal of the pipeline
-This pipeline takes a Seurat v5 spatial object as input and runs six scripts, organized by a Snakefile, that:
+This pipeline takes a Seurat v5 spatial object as input and runs seven scripts, organized by a Snakefile, that:
 1. Prepare the object and export it to a single AnnData `.h5ad` (select the model gene set, normalize, keep the spatial coordinates).
 2. Train CELCOMEN to learn the gene-gene interaction parameters from the spatial neighbour graph.
-3. Run SIMCOMEN to simulate an in-silico perturbation of a target gene in selected populations, producing perturbed and reference cell states.
+3. Run SIMCOMEN twice: a knockout run that sets the target gene to zero in the selected populations to produce the perturbed states, and a sham run that changes no gene to produce the reference states.
 4. Return the results to Seurat, project the perturbed cells into the reference PCA and UMAP, and draw the displacement and stream plots (trajectory inference).
 5. Combine the reference and perturbed objects into one object labelled Before and After.
 6. Run FindMarkers between the Before and After states for each population and export the differential-expression tables and ranked lists.
@@ -94,7 +94,7 @@ Edit `settings.yaml`. Every script reads it, so it is the single place you set t
 - cohort: `sample_column`, `mutant_value`, `annotation_column`, `target_gene`, `included_genes`, `target_populations`, `reference_populations`.
 - display: labels, colours, order, and reference cell size for the plots.
 - model_genes: `n_model_genes`.
-- celcomen and simcomen: neighbours, epochs, learning rate, scalar, seed for each step.
+- celcomen, simcomen_ko, and simcomen_sham: neighbours, epochs, learning rate, scalar, and seed for each step. simcomen_ko and simcomen_sham also set `group` and `target_populations` (the KO group and populations to perturb, and the sham reference group(s) and optional populations).
 - export: `python_env` (the conda env used by the Python scripts and by reticulate).
 - plots: `label_fontsize`, `label_stroke_linewidth`.
 - differential_expression: `min_cells_per_ident`, `species_study`, `check_only_protein_coding_genes`.
@@ -111,7 +111,7 @@ The R steps run with the system `Rscript`; the Python steps run inside the conda
 
 Outputs (created under `project_dir`):
 - celcomen_input_rna_top_genes/ - the AnnData `.h5ad` and the CELCOMEN model, interaction parameters, and training loss
-- celcomen_input_rna_top_genes/celcomen_output_rna_top_genes/simcomen_perturbed/ and .../simcomen_reference/ - the SIMCOMEN result and reference `.h5ad` files
+- celcomen_input_rna_top_genes/celcomen_output_rna_top_genes/simcomen_perturbed/ and .../simcomen_sham/ - the SIMCOMEN perturbed (KO) result and the sham reference `.h5ad` files
 - simcomen_seurat_reference.rds, simcomen_seurat_perturbed.rds, seurat_simcomen_combined.rds - the Seurat objects
 - Simcomen_diff_results/graphs/ - the stream plots
 - Simcomen_diff_results/DEGs/ - the FindMarkers tables and ranked lists (All_genes/, rnks/, Significant_DEGs/)
@@ -138,12 +138,19 @@ Outputs (created under `project_dir`):
 - Keep the perturbed sample and the selected target populations
 - Set the target gene to zero and run SIMCOMEN to the new steady state
 - Store the pre, post, and delta expression layers
-- Save the perturbed results and a reference (all-cells) `.h5ad`
+- Save the perturbed (KO) results `.h5ad`
+
+### 3b) 03B_Simcomen.py - run the sham reference
+- Initialize packages and read settings
+- Keep the sham group(s) and, if set, the selected populations, changing no gene
+- Run SIMCOMEN on each group to its new steady state, processed separately
+- Store the pre, post, and delta sham expression layers
+- Save one combined reference `.h5ad` holding the sham post-SIMCOMEN state
 
 ### 4) 04_Trajectory_Inference.R - return to Seurat and stream plots
 - Load packages and read settings
 - Read the SIMCOMEN `.h5ad` files back into Seurat
-- Build the reference PCA and UMAP and project the perturbed cells into them
+- Build the PCA and UMAP from the sham reference and project the perturbed cells into them
 - Compute the displacement field between reference and perturbed positions
 - Draw the stream and background plots through reticulate and matplotlib
 - Save the reference and perturbed Seurat objects and the plots
